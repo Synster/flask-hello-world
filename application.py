@@ -43,6 +43,14 @@ task_fields = {
     'uri': fields.Url('task')
 }
 
+class WelcomeAPI(Resource):
+
+    def __init__(self):
+        super(WelcomeAPI, self).__init__()
+
+    def get(self):
+        return "Welcome To Your API"
+
 
 class TaskListAPI(Resource):
     decorators = [auth.login_required]
@@ -106,6 +114,7 @@ class TaskAPI(Resource):
         return {'result': True}
 
 
+api.add_resource(WelcomeAPI, '/', endpoint='')
 api.add_resource(TaskListAPI, '/todo/api/v1.0/tasks', endpoint='tasks')
 api.add_resource(TaskAPI, '/todo/api/v1.0/tasks/<int:id>', endpoint='task')
 

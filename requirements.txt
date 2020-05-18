@@ -16,7 +16,7 @@ pytz==2020.1
 pandas==0.24.2
 lxml==4.5.0
 pandas-datareader==0.8.1
-nltk==3.2.4
+nltk==3.4.5
 preprocessing==0.1.13
 sphinx-rtd-theme==0.2.4
 multitasking==0.0.9

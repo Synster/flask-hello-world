@@ -1,12 +1,13 @@
 # Adjusting the size of matplotlib
 import matplotlib as mpl
 mpl.use('Agg')
-
+import os
 import matplotlib.pyplot as plt
 from flask import Flask, request
 from flask_cors import CORS, cross_origin
 from flask_restful import Resource, Api
 from json import dumps
+import json
 #from flask_jsonpify import jsonify
 import yfinance as yf
 
@@ -17,10 +18,7 @@ import numpy as np
 import preprocessing
 
 from pandas import Series, DataFrame
-import yfinance as yf
-
 from matplotlib import style
-
 import math
 import numpy as np
 from sklearn import preprocessing, svm
@@ -34,7 +32,6 @@ from sklearn.linear_model import Ridge
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
-import json
 
 app = Flask(__name__)
 api = Api(app)
@@ -44,7 +41,15 @@ CORS(app)
 from flask import send_file
 
 # http://localhost:5000/get_image?type=1
+class Del(Resource):
+    def get(self):
+        dir_name = "C:/Users/Ashwani/Angular_Workspace/ProjecX"
+        test = os.listdir(dir_name)
 
+        for item in test:
+            if item.endswith(".png"):
+                os.remove(os.path.join(dir_name, item))
+        return("deleted")
 # @app.route('/get_images')
 class Mavg(Resource):
     def get(self):
@@ -57,14 +62,6 @@ class Ret(Resource):
     def get(self):
         
         return send_file('return.png', mimetype='image/gif')
-
-
-# @app.route('/get_return')
-class Comp(Resource):
-    def get(self):
-        
-        return send_file('compare.png', mimetype='image/gif')
-
 
 class Cor(Resource):
     def get(self):
@@ -99,7 +96,7 @@ class PortfolioImage(Resource):
         
         return send_file('portfolio.png', mimetype='image/gif')
 
-# http://localhost:5000/portfolio?c1=AMZN&c2=GOOG&c3=AAPL&c4=FB
+# http://localhost:5000/portfolio?c1=AMZN&c2=GOOG&c3=AAPL&c4=FB&start=2019-01-27&end=2020-03-27&NoOfportfolios=2000
 class Portfolio(Resource):
     def get(self):
 
@@ -107,16 +104,18 @@ class Portfolio(Resource):
         c2 = request.args.get('c2')
         c3 = request.args.get('c3')
         c4 = request.args.get('c4')
-        # startDate = request.args.get('start')
+        startDate = request.args.get('start')
+        endDate = request.args.get('end')
+        Iterations = int(request.args.get('NoOfportfolios'))
+        
 
         stock = [c1,c2,c3,c4]#['AMZN', 'GOOG', 'AAPL','FB']#['AAPL', 'GOOG','MSFT','GE', 'IBM']#['ZM','UBER','SWI','RNG','CRWD', 'WORK']
         # ['AAPL', 'GE', 'GOOG', 'IBM']
-
-        data = yf.download(stock,start = '2019-01-27', end='2020-03-27')['Adj Close']
+        data = yf.download(stock,startDate , endDate)['Adj Close']
 
         stock_ret = np.log(data/data.shift(1))
 
-        num_ports = 5000
+        num_ports = Iterations
         all_weights = np.zeros((num_ports, len(data.columns)))
         ret_arr = np.zeros(num_ports)
         vol_arr = np.zeros(num_ports)
@@ -150,49 +149,37 @@ class Portfolio(Resource):
         print(vol_arr[sharpe_arr.argmax()])
         print(ret_arr[sharpe_arr.argmax()])
         print(all_weights[sharpe_arr.argmax(),:])
-
-        my_json_string = json.dumps({'Max-Sharpe-Risk': vol_arr[sharpe_arr.argmax()], 'Max-Sharpe-Return': ret_arr[sharpe_arr.argmax()], 'Max-w1':all_weights[sharpe_arr.argmax(),0], 'Max-w2':all_weights[sharpe_arr.argmax(),1], 'Max-w3':all_weights[sharpe_arr.argmax(),2], 'Max-w4':all_weights[sharpe_arr.argmax(),3], 'Min-Risk': vol_arr[vol_arr.argmin()], 'Min-Risk-Return': ret_arr[vol_arr.argmin()], 'Min-w1':all_weights[vol_arr.argmin(),0], 'Min-w2':all_weights[vol_arr.argmin(),1], 'Min-w3':all_weights[vol_arr.argmin(),2], 'Min-w4':all_weights[vol_arr.argmin(),3]})
+        data = {
+            'MaxSharpeRisk': vol_arr[sharpe_arr.argmax()], 'MaxSharpeReturn': ret_arr[sharpe_arr.argmax()], 'MaxW1':all_weights[sharpe_arr.argmax(),0], 'MaxW2':all_weights[sharpe_arr.argmax(),1], 'MaxW3':all_weights[sharpe_arr.argmax(),2], 'MaxW4':all_weights[sharpe_arr.argmax(),3], 'MinRisk': vol_arr[vol_arr.argmin()], 'MinRiskReturn': ret_arr[vol_arr.argmin()], 'MinW1':all_weights[vol_arr.argmin(),0], 'MinW2':all_weights[vol_arr.argmin(),1], 'MinW3':all_weights[vol_arr.argmin(),2], 'MinW4':all_weights[vol_arr.argmin(),3]
+                }
+        my_json_string = json.dumps(data)
+        final = json.loads(my_json_string)
 
         print(vol_arr[vol_arr.argmin()])
         print(ret_arr[vol_arr.argmin()])
         print(all_weights[vol_arr.argmin(),:])
-        return my_json_string
+        return final
 
-# @app.route('/add')
-class Employees(Resource):
+# http://localhost:5000/knnpred?company=AMZN&start=2019-01-27&end=2020-03-27
+class KnnPred(Resource):
     def get(self):
-        # global var
-        # global test
-        # var += 1
-        # test='/test'+str(var)
-        # args = request.args
-        # print(var)
-        
+
         company = request.args.get('company')
-        compare = request.args.get('compare')
-
-        df = yf.download(company, start = '2016-01-01', end='2020-04-20')
-
+        # compare = request.args.get('compare')
+        startDate = request.args.get('start')
+        endDate = request.args.get('end')
+        df = yf.download(company, startDate, endDate)
         close_px = df['Adj Close']
         mavg = close_px.rolling(window=100).mean()
-
         print(mavg)
-
         print(df.head())
-
         print(df.tail())
-
-        # import matplotlib.pyplot as plt
-        # from matplotlib import style
-
-        # # Adjusting the size of matplotlib
-        # import matplotlib as mpl
         mpl.rc('figure', figsize=(8, 7))
         mpl.__version__
 
         # Adjusting the style of matplotlib
         style.use('ggplot')
-
+        
         close_px.plot(label=company)
         mavg.plot(label='mavg')
         plt.legend()
@@ -206,63 +193,9 @@ class Employees(Resource):
         rets.plot(label='return')
         plt.savefig('return.png', bbox_inches='tight')
         plt.clf()
-        
         # plt.show()
 
-
-        dfcomp = yf.download(['AAPL', 'GE', 'GOOG', 'IBM', 'MSFT'],start = '2016-01-01', end='2020-03-28')['Adj Close']
-
-        print(dfcomp.tail())
-
-        
-        retscomp = dfcomp.pct_change()
-
-        corr = retscomp.corr()
-        print("hi")
-
-        # cols = [col for col in retscomp.columns if compare in col]
-        # print(retscomp[cols])
-        print(corr)
-
-        plt.scatter(retscomp[company], retscomp[compare])
-        plt.xlabel('Returns-'+company)
-        plt.ylabel('Returns-'+compare)
-
-        plt.savefig('compare.png', bbox_inches='tight')
-        plt.clf()
-
-        # plt.show()
-
-
-        #   Error
-        #pd.scatter_matrix(retscomp, diagonal='kde', figsize=(10, 10));
-
-
-        plt.imshow(corr, cmap='hot', interpolation='none')
-        plt.colorbar()
-        plt.xticks(range(len(corr)), corr.columns)
-        plt.yticks(range(len(corr)), corr.columns)
-
-        # plt.show()
-        plt.savefig('correlation.png', bbox_inches='tight')
-        plt.clf()
-
-
-        plt.scatter(retscomp.mean(), retscomp.std())
-        plt.xlabel('Expected returns')
-        plt.ylabel('Risk')
-        # for label, x, y in zip(retscomp.columns, retscomp.mean(), retscomp.std()):
-        #     plt.annotate(
-        #         label, 
-        #         xy = (x, y), xytext = (20, -20),
-        #         textcoords = 'offset points', ha = 'right', va = 'bottom',
-        #         bbox = dict(boxstyle = 'round,pad=0.5', fc = 'yellow', alpha = 0.5),
-        #         arrowprops = dict(arrowstyle = '->', connectionstyle = 'arc3,rad=0'))
-
-        # plt.show()
-        plt.savefig('risk-ret-rate.png', bbox_inches='tight')
-        plt.clf()
-
+        # close_px = df['Adj Close']
         dfreg = df.loc[:,['Adj Close','Volume']]
 
         a=df['High'] - df['Close']
@@ -280,11 +213,6 @@ class Employees(Resource):
         b = df['Close'] - df['Open']
 
         dfreg['PCT_change'] = b / df['Open'] * 100.0
-
-        # import math
-        # import numpy as np
-        # from sklearn import preprocessing, svm
-        # from sklearn.model_selection import train_test_split
 
         # Drop missing value
         dfreg.fillna(value=-99999, inplace=True)
@@ -315,13 +243,6 @@ class Employees(Resource):
         # Separation of training and testing of model by cross validation train test split
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-        # from sklearn.linear_model import LinearRegression
-        # from sklearn.neighbors import KNeighborsRegressor
-
-        # from sklearn.linear_model import Ridge
-        # from sklearn.preprocessing import PolynomialFeatures
-        # from sklearn.pipeline import make_pipeline
-
         # Linear regression
         clfreg = LinearRegression(n_jobs=-1)
         clfreg.fit(X_train, y_train)
@@ -350,7 +271,7 @@ class Employees(Resource):
         print("The knn regression confidence is ",confidenceknn)
 
         # Printing the forecast
-        forecast_set = clfreg.predict(X_lately)
+        forecast_set = clfknn.predict(X_lately)
         dfreg['Forecast'] = np.nan
         print(forecast_set, confidencereg, forecast_out)
 
@@ -372,6 +293,85 @@ class Employees(Resource):
         # plt.show()
         plt.savefig('forecast.png', bbox_inches='tight')
         plt.clf()
+        val = {
+            'lastValue': forecast_set[forecast_out-1]
+            }
+        fore = json.dumps(val)
+        foreval = json.loads(fore)
+        return foreval
+
+# http://localhost:5000/Corr?c1=AAPL&c2=GOOG&c3=GE&c4=FB&c5=MSFT&start=2019-01-27&end=2020-03-27
+class Corl(Resource) :
+    def get(self):
+        c1 = request.args.get('c1')
+        c2 = request.args.get('c2')
+        c3 = request.args.get('c3')
+        c4 = request.args.get('c4')
+        c5 = request.args.get('c5')
+        startDate = request.args.get('start')
+        endDate = request.args.get('end')
+        dfcomp = yf.download([c1, c2, c3, c4, c5],startDate, endDate)['Adj Close']
+
+        print(dfcomp.tail())
+
+        
+        retscomp = dfcomp.pct_change()
+
+        corr = retscomp.corr()
+        print("hi")
+        print(corr)
+        plt.imshow(corr, cmap='hot', interpolation='none')
+        plt.colorbar()
+        plt.xticks(range(len(corr)), corr.columns)
+        plt.yticks(range(len(corr)), corr.columns)
+
+        # plt.show()
+        plt.savefig('correlation.png', bbox_inches='tight')
+        plt.clf()
+
+
+        plt.scatter(retscomp.mean(), retscomp.std())
+
+        for i, txt in enumerate([c1, c2, c3, c4, c5]):#'AAPL', 'GE', 'GOOG', 'IBM', 'MSFT']):
+            plt.annotate(txt, (retscomp.mean()[i], retscomp.std()[i]))
+        plt.xlabel('Expected returns')
+        plt.ylabel('Risk')
+        plt.savefig('risk-ret-rate.png', bbox_inches='tight')
+        plt.clf()
+
+
+
+# http://localhost:5000/test?company=MSFT&start=2019-01-27&end=2020-03-27&days=100
+class Employees(Resource):
+    def get(self):
+        company = request.args.get('company')
+        startDate = request.args.get('start')
+        endDate = request.args.get('end')
+        daysIntoFuture = request.args.get('days')
+        Future = int(daysIntoFuture)
+        df = yf.download(company, startDate, endDate)
+        close_px = df['Adj Close']
+        mavg = close_px.rolling(window=100).mean()
+        print(mavg)
+        print(df.head())
+        print(df.tail())
+        mpl.rc('figure', figsize=(8, 7))
+        mpl.__version__
+
+        # Adjusting the style of matplotlib
+        style.use('ggplot')
+
+        
+        # plt.show()
+
+        dfcomp = yf.download([company],startDate, endDate)['Adj Close']
+
+        print(dfcomp.tail())
+
+        
+        retscomp = dfcomp.pct_change()
+
+
 
 
         # from scipy.stats import norm
@@ -380,8 +380,8 @@ class Employees(Resource):
 
         result=[]
         #Define Variables
-        S = yf.download(company, start = '2016-01-01', end='2020-03-28')['Adj Close'][-1]#apple['Adj Close'][-1] #starting stock price (i.e. last available real stock price)
-        T = 50 #Number of trading days
+        S = yf.download(company, startDate, endDate)['Adj Close'][-1]#apple['Adj Close'][-1] #starting stock price (i.e. last available real stock price)
+        T = Future #Number of trading days
         days = (df.index[-1] - df.index[0]).days
         cagr = ((((df['Adj Close'][-1]) / df['Adj Close'][1])) ** (365.0/days)) - 1
         mu = cagr# 0.2309 #Return
@@ -423,45 +423,49 @@ class Employees(Resource):
 
         #use numpy mean function to calculate the mean of the result
         print(round(np.mean(result),2))
-
-        mean = json.dumps({'mean': round(np.mean(result),2)})
-        return mean 
+        val = {
+            'mean': round(np.mean(result),2)
+               }
+        mean = json.dumps(val)
+        meanVal = json.loads(mean)
+        return meanVal
 
 @app.route("/")
 def index():
     return "<h1>Hello Azure!</h1>"
 
-# var=1
-# test='/test'+str(var)
+
 test='/test'
+# http://localhost:5000/test?company=MSFT&compare=AAPL&start=2019-01-27&end=2020-03-27&days=100
 api.add_resource(Employees, test) # Route_1
-# api.add_resource(R, '/r') 
+
 api.add_resource(Mavg, '/mavg') 
 api.add_resource(Ret, '/return') 
-api.add_resource(Comp, '/compare') 
 api.add_resource(Cor, '/correlation') 
 api.add_resource(RRrate, '/RRrate') 
 api.add_resource(Forecast, '/forecast') 
 api.add_resource(Monte, '/monte') 
 api.add_resource(Histo, '/histo') 
+api.add_resource(PortfolioImage, '/portfolioimage')
+api.add_resource(Del, '/del') 
+
+# http://localhost:5000/portfolio?c1=AMZN&c2=GOOG&c3=AAPL&c4=FB&start=2019-01-27&end=2020-03-27&NoOfportfolios=2000
 api.add_resource(Portfolio, '/portfolio') 
-api.add_resource(PortfolioImage, '/portfolioimage') 
+
+
+# http://localhost:5000/knnpred?company=AMZN&start=2019-01-27&end=2020-03-27
+api.add_resource(KnnPred, '/knnpred') 
+
+# http://localhost:5000/Corr?c1=AAPL&c2=GOOG&c3=GE&c4=FB&c5=MSFT&start=2019-01-27&end=2020-03-27
+api.add_resource(Corl, '/Corr') 
+
 
 
 if __name__ == '__main__':
-    # company = "GE"
 
-    # df = yf.download(company, start = '2016-01-01', end='2020-03-03')#'2017-01-01')#web.DataReader("AAPL", 'yahoo', start, end)
-    # close_px = df['Adj Close']
-    # mavg = close_px.rolling(window=100).mean()
-        
-    # print(mavg)
-    # print(df.head())
-    # print(df.tail())
-    # print("hi")
-    # mpl.rc('figure', figsize=(8, 7))
-    # mpl.__version__
     app.run()
+
+
 
 
 
